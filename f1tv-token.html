@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F1TV Token Capture</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1c1c1e; --muted: #6b6f76; --line: #d9dce1;
+    --card: #f5f6f8; --accent: #e10600; --ok: #1a9d4b; --warn: #c77700; --err: #d4261c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1c1c1e; --fg: #ececee; --muted: #9a9ea6; --line: #3a3d42; --card: #26272b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h1::before { content: ""; display: inline-block; width: 4px; height: 18px; background: var(--accent);
+               margin-right: 8px; vertical-align: -3px; border-radius: 2px; }
+  p.sub { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+  .status { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .pill { background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+          padding: 4px 12px; font-size: 13px; }
+  .pill b { font-weight: 600; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  .step h2 { font-size: 14px; margin: 0 0 6px; }
+  .step h2 span { color: var(--accent); margin-right: 6px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 4px; }
+  textarea, input { width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--line);
+                    border-radius: 8px; padding: 8px 10px; font: 13px ui-monospace, Consolas, monospace; }
+  textarea { resize: vertical; min-height: 64px; }
+  textarea:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .info { font-size: 13px; margin-top: 6px; min-height: 18px; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .err { color: var(--err); } .muted { color: var(--muted); }
+  button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 16px;
+           font: 600 14px system-ui, sans-serif; cursor: pointer; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); font-weight: 500; padding: 6px 10px; font-size: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  details { margin-top: 14px; font-size: 13px; color: var(--muted); }
+  details summary { cursor: pointer; }
+  details code, .step code { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 12px; }
+  details ol { padding-left: 20px; }
+  #bm { color: var(--accent); font-weight: 600; text-decoration: none; border: 1px dashed var(--accent);
+        padding: 2px 8px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>F1TV Token Capture</h1>
+  <p class="sub">Deliver your F1TV token to the F1 Sensor integration. The token is sent only to this Home Assistant and is never stored.</p>
+
+  <div class="status" id="status" hidden>
+    <span class="pill">Token: <b id="st-status">–</b></span>
+    <span class="pill">Expires: <b id="st-exp">–</b></span>
+  </div>
+
+  <section class="step">
+    <h2><span>1</span>Start a pairing session</h2>
+    <div class="muted" style="font-size:13px">
+      Settings → Devices &amp; services → F1 Sensor → <b>Reconfigure</b> → <b>Connect F1TV access with Token Helper</b> → <b>Open website</b>.
+      Copy the full URL of the page that opens and paste it here. Sessions last 5 minutes.
+    </div>
+    <label for="pair">Pairing link</label>
+    <textarea id="pair" spellcheck="false" placeholder="https://nicxe.github.io/f1_sensor/help/f1tv-token-helper?callback_url=…&session_id=…&nonce=…"></textarea>
+    <div class="info" id="pair-info"></div>
+  </section>
+
+  <section class="step">
+    <h2><span>2</span>Paste your F1TV token</h2>
+    <div class="muted" style="font-size:13px">
+      Accepts the JWT itself, a <code>Bearer …</code> header, the <code>login-session</code> cookie value, or the cookie JSON.
+    </div>
+    <label for="tok">Token</label>
+    <textarea id="tok" spellcheck="false" autocomplete="off" placeholder="eyJ…"></textarea>
+    <div class="info" id="tok-info"></div>
+    <div class="row">
+      <button class="ghost" id="capture" type="button">Capture token from my browser</button>
+      <button class="ghost" id="copy" type="button" disabled>Copy token</button>
+      <span class="muted" style="font-size:12px" id="cap-hint">Needs the companion extension and an F1TV sign-in.</span>
+    </div>
+  </section>
+
+  <div class="row">
+    <button id="send" disabled>Send to Home Assistant</button>
+    <button class="ghost" id="clear" type="button">Clear</button>
+  </div>
+  <div class="info" id="result" role="status"></div>
+
+  <details>
+    <summary>Notes and getting the token manually</summary>
+    <ol>
+      <li>The <b>Capture</b> button needs the companion extension (<code>extension/</code> folder, see README). Browsers don't let a web page read another site's login, so the extension does that one step.</li>
+      <li>Manual alternative: sign in at <code>f1tv.formula1.com</code>, open developer tools → Application (Chrome/Edge) or Storage (Firefox) → Cookies → copy the value of <code>login-session</code> and paste it above. The page extracts <code>subscriptionToken</code> from it.</li>
+      <li>Treat the token like a password. Don't post it in issues or screenshots.</li>
+      <li>If this page isn't served from your Home Assistant (e.g. opened from disk), the browser will block the send. Host it under <code>/config/www/</code>.</li>
+    </ol>
+  </details>
+</main>
+
+<script>
+"use strict";
+const CALLBACK_PATH = "/api/f1_sensor/auth/f1tv/callback";
+const $ = (id) => document.getElementById(id);
+const JWT_RE = /eyJ[\w-]+\.[\w-]+\.[\w-]+/;
+
+/* ---------- parsing ---------- */
+
+function parsePairing(text) {
+  text = (text || "").trim();
+  if (!text) return null;
+  let url;
+  try { url = new URL(text); } catch { return { error: "That doesn't look like a URL." }; }
+  const q = url.searchParams;
+  const session_id = q.get("session_id"), nonce = q.get("nonce");
+  if (!session_id || !nonce) return { error: "Link is missing session_id / nonce. Copy the full URL of the pairing page." };
+  const expires = q.get("expires_at") ? new Date(q.get("expires_at")) : null;
+  return {
+    session_id, nonce,
+    callback_url: q.get("callback_url") || "",
+    expires_at: expires && !isNaN(expires) ? expires : null,
+  };
+}
+
+function b64urlDecode(s) {
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  s += "=".repeat((4 - (s.length % 4)) % 4);
+  return decodeURIComponent(escape(atob(s)));
+}
+
+function safeDecodeURI(s) {
+  for (let i = 0; i < 3; i++) {
+    if (!/%[0-9a-f]{2}/i.test(s)) break;
+    try { s = decodeURIComponent(s); } catch { break; }
+  }
+  return s;
+}
+
+/* Returns { token } or { error }. */
+function extractToken(raw) {
+  let s = (raw || "").trim().replace(/^["']|["']$/g, "");
+  if (!s) return null;
+  s = s.replace(/^login-session=/i, "").replace(/^authorization:\s*/i, "").replace(/^bearer\s+/i, "");
+  s = safeDecodeURI(s);
+  // cookie string with several cookies
+  const m = s.match(/login-session=([^;]+)/i);
+  if (m) s = safeDecodeURI(m[1]);
+  // JSON (cookie value) -> data.subscriptionToken
+  if (s.startsWith("{")) {
+    try {
+      const j = JSON.parse(s);
+      const t = j?.data?.subscriptionToken ?? j?.subscriptionToken ?? j?.subscription_token;
+      if (typeof t === "string" && JWT_RE.test(t)) return { token: t.match(JWT_RE)[0] };
+      return { error: "JSON found but it has no subscriptionToken. Are you signed in with an F1TV subscription?" };
+    } catch { /* fall through to regex */ }
+  }
+  const k = s.match(/"subscriptionToken"\s*:\s*"([^"]+)"/);
+  if (k && JWT_RE.test(k[1])) return { token: k[1].match(JWT_RE)[0] };
+  const j = s.match(JWT_RE);
+  if (j) return { token: j[0] };
+  return { error: "No JWT found in that text." };
+}
+
+function inspectJwt(token) {
+  try {
+    const payload = JSON.parse(b64urlDecode(token.split(".")[1]));
+    const exp = typeof payload.exp === "number" ? new Date(payload.exp * 1000) : null;
+    return { exp, payload };
+  } catch { return { error: true }; }
+}
+
+/* ---------- UI ---------- */
+
+let pairing = null, token = null, timer = null;
+
+function fmtRemaining(ms) {
+  if (ms <= 0) return "expired";
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s left`;
+}
+
+function refreshPairInfo() {
+  const el = $("pair-info");
+  if (!pairing) { el.textContent = ""; return; }
+  if (pairing.error) { el.className = "info err"; el.textContent = pairing.error; return; }
+  if (pairing.expires_at) {
+    const left = pairing.expires_at - Date.now();
+    el.className = "info " + (left > 60000 ? "ok" : left > 0 ? "warn" : "err");
+    el.textContent = left > 0
+      ? `Session found – ${fmtRemaining(left)}.`
+      : "This pairing session has expired. Start a new one from Reconfigure.";
+  } else {
+    el.className = "info ok";
+    el.textContent = "Session found.";
+  }
+}
+
+function refreshTokInfo() {
+  const el = $("tok-info");
+  if (!token) { el.textContent = ""; return; }
+  if (token.error) { el.className = "info err"; el.textContent = token.error; return; }
+  const info = inspectJwt(token.token);
+  if (info.error) { el.className = "info err"; el.textContent = "Token isn't a readable JWT."; return; }
+  if (info.exp) {
+    const left = info.exp - Date.now();
+    if (left <= 0) { el.className = "info err"; el.textContent = `Token expired ${info.exp.toLocaleString()}. Fetch a fresh one.`; return; }
+    const h = Math.round(left / 3600000);
+    el.className = "info ok";
+    el.textContent = `Valid JWT, expires ${info.exp.toLocaleString()} (~${h >= 48 ? Math.round(h / 24) + " days" : h + " h"}).`;
+  } else {
+    el.className = "info warn";
+    el.textContent = "JWT found but it has no expiry claim.";
+  }
+}
+
+function canSend() {
+  if (!pairing || pairing.error || !token || token.error) return false;
+  if (pairing.expires_at && pairing.expires_at <= Date.now()) return false;
+  const info = inspectJwt(token.token);
+  if (info.error || (info.exp && info.exp <= Date.now())) return false;
+  return true;
+}
+
+function update() {
+  pairing = parsePairing($("pair").value);
+  token = extractToken($("tok").value);
+  refreshPairInfo();
+  refreshTokInfo();
+  $("send").disabled = !canSend();
+  $("copy").disabled = !(token && token.token);
+}
+
+$("copy").addEventListener("click", async () => {
+  const hint = $("cap-hint");
+  hint.style.fontSize = "12px";
+  // F1 Sensor's Reconfigure field wants the full header value: "Bearer <token>".
+  const header = "Bearer " + token.token;
+  try {
+    await navigator.clipboard.writeText(header);
+  } catch {
+    // insecure-context / iframe fallback
+    const ta = document.createElement("textarea");
+    ta.value = header; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    if (!ok) { hint.className = "err"; hint.textContent = "Couldn't copy to the clipboard."; return; }
+  }
+  hint.className = "ok";
+  hint.textContent = "Copied. Paste it into F1 Sensor → Reconfigure → F1TV authorization value.";
+});
+
+/* ---------- send ---------- */
+
+function callbackTarget() {
+  // Same-origin first: works from /local/ inside HA and avoids CORS / unreachable container addresses.
+  if (location.protocol.startsWith("http")) return location.origin + CALLBACK_PATH;
+  return pairing.callback_url;
+}
+
+async function send() {
+  const out = $("result");
+  $("send").disabled = true;
+  out.className = "info muted";
+  out.textContent = "Sending…";
+  try {
+    const res = await fetch(callbackTarget(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      credentials: "omit",
+      body: JSON.stringify({
+        session_id: pairing.session_id,
+        nonce: pairing.nonce,
+        subscription_token: token.token,
+      }),
+    });
+    let body = {};
+    try { body = await res.json(); } catch { /* ignore */ }
+    if (res.ok && body.ok) {
+      out.className = "info ok";
+      out.textContent = "Connected." + (body.expires_at ? ` Token expires ${new Date(body.expires_at).toLocaleString()}.` : "") + " F1 Sensor is reloading.";
+      $("tok").value = ""; $("pair").value = "";
+      update();
+      setTimeout(loadStatus, 4000);
+    } else {
+      out.className = "info err";
+      out.textContent = explain(res.status, body.code);
+      $("send").disabled = !canSend();
+    }
+  } catch (e) {
+    out.className = "info err";
+    out.textContent = "Couldn't reach Home Assistant. This page must be served from your HA (e.g. /local/f1tv-token.html), not opened from disk.";
+    $("send").disabled = !canSend();
+  }
+}
+
+function explain(status, code) {
+  const map = {
+    expired_pairing: "Pairing session expired or already used. Start a new one from Reconfigure.",
+    pairing_already_used: "That pairing session was already used. Start a new one.",
+    invalid_nonce: "Nonce mismatch – copy the pairing link again.",
+    missing_field: "Something was missing from the request.",
+    rate_limited: "Too many attempts. Wait a minute.",
+    gate_closed: "F1TV auth isn't enabled in this version of F1 Sensor.",
+    entry_not_found: "The F1 Sensor entry no longer exists.",
+    body_too_large: "Token too large.",
+  };
+  return map[code] || `Home Assistant rejected it (${status}${code ? ": " + code : ""}). If the token is valid, start a fresh pairing session.`;
+}
+
+/* ---------- optional status (same-origin HA only) ---------- */
+
+async function loadStatus() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("hassTokens") || "null");
+    if (!raw || !raw.access_token) return;
+    const get = async (id) => {
+      const r = await fetch("/api/states/" + id, { headers: { Authorization: "Bearer " + raw.access_token } });
+      return r.ok ? r.json() : null;
+    };
+    const [s, e] = await Promise.all([get("sensor.f1_f1tv_token_status"), get("sensor.f1_f1tv_token_expires_at")]);
+    if (!s && !e) return;
+    $("status").hidden = false;
+    $("st-status").textContent = s ? s.state : "–";
+    $("st-exp").textContent = e && !isNaN(Date.parse(e.state)) ? new Date(e.state).toLocaleString() : "–";
+  } catch { /* status is optional */ }
+}
+
+/* ---------- capture via companion extension ---------- */
+
+let extReady = false;
+window.addEventListener("message", (ev) => {
+  if (ev.source !== window || ev.origin !== location.origin || !ev.data) return;
+  const d = ev.data;
+  if (d.type === "F1TV_EXT_READY") {
+    extReady = true;
+    $("cap-hint").textContent = "Extension detected.";
+  } else if (d.type === "F1TV_CAPTURE_RESULT") {
+    const hint = $("cap-hint");
+    $("capture").disabled = false;
+    if (d.token) {
+      $("tok").value = d.token;
+      hint.className = "ok"; hint.style.fontSize = "12px";
+      hint.textContent = "Token captured.";
+      update();
+    } else {
+      hint.className = "err"; hint.style.fontSize = "12px";
+      hint.textContent = d.error || "Capture failed.";
+    }
+  }
+});
+
+$("capture").addEventListener("click", () => {
+  const hint = $("cap-hint");
+  hint.className = "muted"; hint.style.fontSize = "12px";
+  if (!extReady) {
+    hint.className = "err";
+    hint.textContent = "Companion extension not detected. Install it (README), then reload this page.";
+    return;
+  }
+  $("capture").disabled = true;
+  hint.textContent = "Reading your F1TV sign-in…";
+  window.postMessage({ type: "F1TV_CAPTURE_REQUEST" }, location.origin);
+  setTimeout(() => { if ($("capture").disabled) { $("capture").disabled = false; hint.className = "err"; hint.textContent = "No response from the extension."; } }, 8000);
+});
+
+/* ---------- init ---------- */
+
+$("pair").addEventListener("input", update);
+$("tok").addEventListener("input", update);
+$("send").addEventListener("click", send);
+$("clear").addEventListener("click", () => { $("pair").value = ""; $("tok").value = ""; $("result").textContent = ""; update(); });
+timer = setInterval(() => { refreshPairInfo(); $("send").disabled = !canSend(); }, 1000);
+loadStatus();
+update();
+window.postMessage({ type: "F1TV_PING" }, location.origin);
+</script>
+</body>
+</html>

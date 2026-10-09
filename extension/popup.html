@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  body { width: 300px; margin: 0; padding: 14px; font: 13px/1.4 system-ui, sans-serif; color: #1c1c1e; background: #fff; }
+  @media (prefers-color-scheme: dark) { body { color: #ececee; background: #1c1c1e; } }
+  h1 { font-size: 14px; margin: 0 0 10px; border-left: 4px solid #e10600; padding-left: 8px; }
+  button { width: 100%; background: #e10600; color: #fff; border: 0; border-radius: 8px; padding: 10px; font: 600 14px system-ui, sans-serif; cursor: pointer; }
+  button:disabled { opacity: .5; }
+  #msg { margin-top: 10px; min-height: 18px; }
+  .ok { color: #1a9d4b; } .err { color: #d4261c; } .muted { color: #8a8d94; font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <h1>F1TV Token Capture</h1>
+  <button id="go">Copy my F1TV token</button>
+  <div id="msg" role="status" style="word-break:break-word"></div>
+  <a id="open" href="#" hidden style="color:#e10600;font-size:12px">Open F1TV to sign in</a>
+  <textarea id="tok" readonly hidden rows="4" style="width:100%;margin-top:8px;box-sizing:border-box;font:11px ui-monospace,Consolas,monospace"></textarea>
+  <div class="muted">Then paste it into F1 Sensor → Reconfigure → F1TV authorization value.</div>
+  <script src="popup.js"></script>
+</body>
+</html>
